@@ -2,12 +2,16 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 6000,
+    });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     return conn;
   } catch (error) {
-    console.error(`MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
+    console.warn(
+      `[MongoDB Warning] Could not reach Atlas (${error.message}). Running with hybrid in-memory + DSA store active.`
+    );
+    return null;
   }
 };
 

@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import MapView from '../../components/MapView';
+import { useSocket } from '../../context/SocketContext';
 
-/**
- * Fallback local seed of the 15 city nodes & edges in case the backend server is starting up,
- * ensuring the UI and map always render instantaneously.
- */
 const FALLBACK_NODES = [
   { id: 'A1', coords: [12.9756, 77.6066], lat: 12.9756, lng: 77.6066, name: 'MG Road Metro Hub' },
   { id: 'A2', coords: [12.9719, 77.5937], lat: 12.9719, lng: 77.5937, name: 'Cubbon Park Central' },
@@ -54,46 +51,7 @@ const FALLBACK_EDGE_LIST = [
   ['A14', 'A15', 4.0, 10],
 ];
 
-const FALLBACK_DRIVERS = [
-  {
-    id: 'DRV-101',
-    name: 'Arjun Nair',
-    phone: '+91 98450 11201',
-    rating: 4.95,
-    currentLocation: { lat: 12.9762, lng: 77.6081 },
-    vehicle: { model: 'Ather 450X Electric', plateNumber: 'KA 01 EM 4501', type: 'Moto', capacity: 1 },
-  },
-  {
-    id: 'DRV-102',
-    name: 'Rakesh Gowda',
-    phone: '+91 98450 22314',
-    rating: 4.82,
-    currentLocation: { lat: 12.9365, lng: 77.6231 },
-    vehicle: { model: 'Bajaj RE Compact CNG', plateNumber: 'KA 05 AA 7823', type: 'Auto', capacity: 3 },
-  },
-  {
-    id: 'DRV-103',
-    name: 'Vikramaditya Rao',
-    phone: '+91 98450 33981',
-    rating: 4.92,
-    currentLocation: { lat: 12.9689, lng: 77.6194 },
-    vehicle: { model: 'Maruti Suzuki Dzire', plateNumber: 'KA 03 MN 9012', type: 'Economy', capacity: 4 },
-  },
-  {
-    id: 'DRV-104',
-    name: 'Siddharth Menon',
-    phone: '+91 98450 44812',
-    rating: 4.98,
-    currentLocation: { lat: 12.9772, lng: 77.6395 },
-    vehicle: { model: 'Hyundai Ioniq 5 EV', plateNumber: 'KA 01 ZP 0007', type: 'Premium', capacity: 4 },
-  },
-];
-
-/**
- * Local client-side fallback computation mirroring backend Dijkstra + Fares + DriverMatcher
- * in case the backend HTTP server is unreachable.
- */
-function computeClientSideFallback(startId, endId, selectedVehicleType) {
+function computeClientSideFallback(startId, endId, candidateDrivers = []) {
   const nodeMap = new Map(FALLBACK_NODES.map((n) => [n.id, n]));
   const adj = new Map(FALLBACK_NODES.map((n) => [n.id, []]));
 
@@ -168,24 +126,30 @@ function computeClientSideFallback(startId, endId, selectedVehicleType) {
   });
 
   const startNode = nodeMap.get(startId);
-  const rankedDrivers = FALLBACK_DRIVERS.map((d) => {
-    const dLat = ((d.currentLocation.lat - startNode.lat) * Math.PI) / 180;
-    const dLng = ((d.currentLocation.lng - startNode.lng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((startNode.lat * Math.PI) / 180) *
-        Math.cos((d.currentLocation.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2;
-    const distToPickup = Number((6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.22).toFixed(2));
-    const score = Number((0.6 * distToPickup - 0.4 * d.rating).toFixed(4));
-    return {
-      ...d,
-      distanceToPickupKm: distToPickup,
-      etaToPickupMin: Math.max(2, Math.round(distToPickup * 2.5)),
-      score,
-      scoreBreakdown: `(0.6 × ${distToPickup}km) - (0.4 × ${d.rating}★) = ${score}`,
-    };
-  }).sort((a, b) => a.score - b.score);
+  const rankedDrivers = candidateDrivers
+    .filter((d) => !d.isBlocked)
+    .map((d) => {
+      const loc = d.currentLocation || { lat: 12.9689, lng: 77.6194 };
+      const dLat = ((loc.lat - startNode.lat) * Math.PI) / 180;
+      const dLng = ((loc.lng - startNode.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((startNode.lat * Math.PI) / 180) *
+          Math.cos((loc.lat * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      const distToPickup = Number(
+        (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.22).toFixed(2)
+      );
+      const score = Number((0.6 * distToPickup - 0.4 * (d.rating || 4.9)).toFixed(4));
+      return {
+        ...d,
+        distanceToPickupKm: distToPickup,
+        etaToPickupMin: Math.max(2, Math.round(distToPickup * 2.5)),
+        score,
+        scoreBreakdown: `(0.6 × ${distToPickup}km) - (0.4 × ${d.rating}★) = ${score}`,
+      };
+    })
+    .sort((a, b) => a.score - b.score);
 
   return {
     route: {
@@ -218,6 +182,18 @@ const VEHICLE_ICONS = {
 };
 
 const RiderDashboard = () => {
+  const {
+    liveDrivers,
+    activeRide,
+    setActiveRide,
+    lastReceipt,
+    setLastReceipt,
+    setActivePortal,
+    requestRideRealtime,
+    acceptRideOffer,
+    cancelActiveRide,
+  } = useSocket();
+
   const [nodes, setNodes] = useState(FALLBACK_NODES);
   const [edges, setEdges] = useState(() => {
     const nodeMap = new Map(FALLBACK_NODES.map((n) => [n.id, n]));
@@ -240,29 +216,21 @@ const RiderDashboard = () => {
   const [dispatchInfo, setDispatchInfo] = useState(null);
   const [calculating, setCalculating] = useState(false);
 
-  // Active Ride State Machine
-  const [activeRide, setActiveRide] = useState(null);
-  const [dispatching, setDispatching] = useState(false);
-
-  // 1. Load City Network Graph from GET /api/dsa/network
+  // Load 15-node city network graph from GET /api/dsa/network
   useEffect(() => {
     const fetchNetwork = async () => {
       try {
         const res = await api.get('/dsa/network');
-        if (res.data?.nodes?.length) {
-          setNodes(res.data.nodes);
-        }
-        if (res.data?.edges?.length) {
-          setEdges(res.data.edges);
-        }
+        if (res.data?.nodes?.length) setNodes(res.data.nodes);
+        if (res.data?.edges?.length) setEdges(res.data.edges);
       } catch {
-        // Fallback already populated
+        // Fallback already active
       }
     };
     fetchNetwork();
   }, []);
 
-  // 2. Calculate Dijkstra Shortest Path & Dynamic Fares whenever nodes or vehicle change
+  // Compute Dijkstra shortest path, dynamic fares, and PriorityQueue DriverMatcher ranking
   const computeRouteAndFares = useCallback(async () => {
     if (!startNodeId || !endNodeId) return;
     setCalculating(true);
@@ -282,102 +250,63 @@ const RiderDashboard = () => {
         return;
       }
     } catch {
-      // Fallback to identical client-side DSA engine if backend is offline
+      // Fallback to local engine
     }
 
     const fallback = computeClientSideFallback(
       startNodeId,
       endNodeId,
-      selectedVehicle
+      liveDrivers
     );
     setRouteData(fallback.route);
     setFares(fallback.fares);
     setDispatchInfo(fallback.dispatch);
     setCalculating(false);
-  }, [startNodeId, endNodeId, selectedVehicle]);
+  }, [startNodeId, endNodeId, selectedVehicle, liveDrivers]);
 
   useEffect(() => {
     computeRouteAndFares();
   }, [computeRouteAndFares]);
 
-  // 3. Handle Swap Pickup & Destination
   const handleSwapLocations = () => {
     setStartNodeId(endNodeId);
     setEndNodeId(startNodeId);
-    setActiveRide(null);
   };
 
-  // 4. Request Ride & Execute PriorityQueue DriverMatcher Dispatch
-  const handleRequestRide = async () => {
+  const handleRequestRide = () => {
     if (startNodeId === endNodeId) return;
-    setDispatching(true);
-
-    // Immediately show SEARCHING state
-    setActiveRide({
-      status: 'SEARCHING',
-      vehicleType: selectedVehicle,
-      pickupNode: startNodeId,
-      destinationNode: endNodeId,
-    });
-
-    try {
-      const res = await api.post('/dsa/dispatch', {
-        startNodeId,
-        endNodeId,
-        vehicleType: selectedVehicle,
-      });
-
-      if (res.data?.success && res.data.ride) {
-        setTimeout(() => {
-          setActiveRide(res.data.ride);
-          setDispatching(false);
-        }, 650);
-        return;
-      }
-    } catch {
-      // Fallback simulation using local DriverMatcher result
-    }
-
     const selectedTierFare = fares[selectedVehicle] || {
-      totalFare: 145,
-      estimatedDurationMin: routeData?.durationMin || 15,
+      totalFare: 165,
+      estimatedDurationMin: routeData?.durationMin || 16,
     };
 
     const startNodeObj = nodes.find((n) => n.id === startNodeId);
     const endNodeObj = nodes.find((n) => n.id === endNodeId);
 
-    setTimeout(() => {
-      setActiveRide({
-        rideId: `RIDE-${Math.floor(100000 + Math.random() * 900000)}`,
-        status: 'ASSIGNED',
-        otp: String(Math.floor(1000 + Math.random() * 9000)),
-        vehicleType: selectedVehicle,
-        pickup: {
-          nodeId: startNodeId,
-          address: startNodeObj?.name || startNodeId,
-        },
-        destination: {
-          nodeId: endNodeId,
-          address: endNodeObj?.name || endNodeId,
-        },
-        distanceKm: routeData?.distanceKm || 0,
-        durationMin: selectedTierFare.estimatedDurationMin,
-        fare: selectedTierFare.totalFare,
-        path: routeData?.path || [],
-        driver: dispatchInfo?.optimalDriver,
-        rankedCandidates: dispatchInfo?.rankedDrivers || [],
-      });
-      setDispatching(false);
-    }, 650);
-  };
-
-  const advanceRideStatus = () => {
-    if (!activeRide) return;
-    const order = ['ASSIGNED', 'ARRIVING', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'];
-    const idx = order.indexOf(activeRide.status);
-    if (idx !== -1 && idx < order.length - 1) {
-      setActiveRide({ ...activeRide, status: order[idx + 1] });
-    }
+    requestRideRealtime({
+      pickupNodeId: startNodeId,
+      destinationNodeId: endNodeId,
+      pickup: {
+        nodeId: startNodeId,
+        address: startNodeObj?.name || startNodeId,
+        lat: startNodeObj?.lat || 12.9756,
+        lng: startNodeObj?.lng || 77.6066,
+      },
+      destination: {
+        nodeId: endNodeId,
+        address: endNodeObj?.name || endNodeId,
+        lat: endNodeObj?.lat || 12.9121,
+        lng: endNodeObj?.lng || 77.6446,
+      },
+      distanceKm: routeData?.distanceKm || 6.4,
+      durationMin: selectedTierFare.estimatedDurationMin,
+      fare: selectedTierFare.totalFare,
+      vehicleType: selectedVehicle,
+      path: routeData?.path || ['A1', 'A6', 'A8', 'A9', 'A10'],
+      coordinates: routeData?.coordinates || [],
+      optimalDriver: dispatchInfo?.optimalDriver,
+      rankedCandidates: dispatchInfo?.rankedDrivers,
+    });
   };
 
   const currentTierFare = fares[selectedVehicle];
@@ -445,7 +374,7 @@ const RiderDashboard = () => {
 
       {/* Main Two-Column Booking & Map Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Control Column: Node Selectors, Dynamic Fares, Request Ride */}
+        {/* Left Control Column */}
         <div className="lg:col-span-5 space-y-6">
           {/* Pickup & Destination Card */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
@@ -479,10 +408,7 @@ const RiderDashboard = () => {
                 <select
                   id="pickup-node-select"
                   value={startNodeId}
-                  onChange={(e) => {
-                    setStartNodeId(e.target.value);
-                    setActiveRide(null);
-                  }}
+                  onChange={(e) => setStartNodeId(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
                 >
                   {nodes.map((node) => (
@@ -503,10 +429,7 @@ const RiderDashboard = () => {
                 <select
                   id="dest-node-select"
                   value={endNodeId}
-                  onChange={(e) => {
-                    setEndNodeId(e.target.value);
-                    setActiveRide(null);
-                  }}
+                  onChange={(e) => setEndNodeId(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition"
                 >
                   {nodes.map((node) => (
@@ -608,17 +531,14 @@ const RiderDashboard = () => {
               })}
             </div>
 
-            {/* Request Ride CTA */}
             <button
               type="button"
-              disabled={dispatching || startNodeId === endNodeId}
+              disabled={startNodeId === endNodeId}
               onClick={handleRequestRide}
               className="w-full mt-5 py-3.5 px-5 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/30 transition cursor-pointer flex items-center justify-center gap-2"
             >
               {startNodeId === endNodeId ? (
                 <span>Select Different Pickup & Destination Nodes</span>
-              ) : dispatching ? (
-                <span>Executing PriorityQueue DriverMatcher...</span>
               ) : (
                 <span>
                   Request {selectedVehicle} Ride • ₹
@@ -628,24 +548,22 @@ const RiderDashboard = () => {
             </button>
           </div>
 
-          {/* Active Dispatched Ride Status Card */}
+          {/* Live Active Ride & Real-Time OTP / Driver Telemetry Card */}
           {activeRide && (
-            <div className="bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/40 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/50 rounded-2xl p-5 shadow-2xl space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 block">
-                    Live Dispatch Status
+                    Live Socket.IO Ride Session • {activeRide.rideId}
                   </span>
                   <h4 className="text-lg font-bold text-white">
-                    {activeRide.status === 'SEARCHING'
-                      ? 'Scanning Online Drivers in Min-Heap...'
-                      : `Status: ${activeRide.status}`}
+                    Status: {activeRide.status}
                   </h4>
                 </div>
 
                 {activeRide.otp && (
-                  <div className="px-3 py-1.5 rounded-xl bg-amber-400/15 border border-amber-400/40 text-amber-300 font-mono text-sm font-bold">
-                    OTP: {activeRide.otp}
+                  <div className="px-3.5 py-1.5 rounded-xl bg-amber-400/20 border border-amber-400/50 text-amber-300 font-mono text-sm font-extrabold">
+                    Rider PIN: {activeRide.otp}
                   </div>
                 )}
               </div>
@@ -667,50 +585,96 @@ const RiderDashboard = () => {
                         {activeRide.driver.vehicle?.plateNumber}
                       </span>
                     </p>
-                    <p className="text-[11px] text-indigo-300 font-mono mt-1">
-                      Heuristic: {activeRide.driver.scoreBreakdown}
-                    </p>
+                    {activeRide.currentDriverNode && (
+                      <p className="text-xs text-indigo-300 font-semibold mt-1">
+                        Live Position: Node [{activeRide.currentDriverNode}]{' '}
+                        {activeRide.nextNodeId
+                          ? `→ Next: [${activeRide.nextNodeId}]`
+                          : ''}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-amber-400 font-bold text-sm block">
                       ★ {activeRide.driver.rating}
                     </span>
-                    <span className="text-xs text-slate-400 block">
-                      {activeRide.driver.etaToPickupMin} min away
+                    <span className="text-xs text-emerald-400 font-bold block">
+                      ₹{activeRide.fare}
                     </span>
                   </div>
                 </div>
               )}
 
-              {activeRide.status !== 'SEARCHING' && (
-                <div className="flex items-center gap-2 pt-1">
-                  {activeRide.status !== 'COMPLETED' ? (
-                    <button
-                      type="button"
-                      onClick={advanceRideStatus}
-                      className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition cursor-pointer"
-                    >
-                      Simulate Next Step →
-                    </button>
-                  ) : (
-                    <span className="flex-1 py-2 px-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold text-xs text-center">
-                      ✓ Trip Completed! Fare ₹{activeRide.fare} Paid
-                    </span>
-                  )}
+              {/* Quick Presentation Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {activeRide.status === 'REQUESTED' && (
                   <button
                     type="button"
-                    onClick={() => setActiveRide(null)}
-                    className="py-2.5 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                    onClick={() => acceptRideOffer(activeRide)}
+                    className="py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition cursor-pointer"
                   >
-                    Reset
+                    ⚡ Instant Driver Accept
                   </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setActivePortal('driver')}
+                  className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer"
+                >
+                  Open Driver Console (Verify OTP) →
+                </button>
+
+                {activeRide.status !== 'COMPLETED' && (
+                  <button
+                    type="button"
+                    onClick={() => cancelActiveRide('rider', 'Cancelled by passenger')}
+                    className="py-2.5 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-bold text-xs transition cursor-pointer"
+                  >
+                    Cancel Ride
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Completed Trip Receipt Modal/Card */}
+          {lastReceipt && (
+            <div className="bg-emerald-950/30 border border-emerald-500/50 rounded-2xl p-5 shadow-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-extrabold text-xs uppercase">
+                  Trip Receipt
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLastReceipt(null);
+                    setActiveRide(null);
+                  }}
+                  className="text-xs text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Dismiss ✕
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-white text-base">
+                    Paid ₹{lastReceipt.fare} to {lastReceipt.driverName}
+                  </h4>
+                  <p className="text-xs text-slate-300">
+                    [{lastReceipt.pickup?.nodeId}] {lastReceipt.pickup?.address} → [
+                    {lastReceipt.destination?.nodeId}] {lastReceipt.destination?.address}
+                  </p>
                 </div>
-              )}
+                <span className="font-mono text-emerald-300 font-extrabold text-lg">
+                  ✓ PAID
+                </span>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Right Column: Interactive Leaflet Map & Greedy DriverMatcher Queue Table */}
+        {/* Right Column: Interactive Map & Greedy DriverMatcher Table */}
         <div className="lg:col-span-7 space-y-6">
           <div className="h-[500px]">
             <MapView
@@ -720,16 +684,10 @@ const RiderDashboard = () => {
               endNodeId={endNodeId}
               routePath={routeData?.path || []}
               routeCoordinates={routeData?.coordinates || []}
-              drivers={dispatchInfo?.rankedDrivers || FALLBACK_DRIVERS}
+              drivers={dispatchInfo?.rankedDrivers || liveDrivers}
               optimalDriver={dispatchInfo?.optimalDriver}
-              onSelectPickup={(id) => {
-                setStartNodeId(id);
-                setActiveRide(null);
-              }}
-              onSelectDestination={(id) => {
-                setEndNodeId(id);
-                setActiveRide(null);
-              }}
+              onSelectPickup={(id) => setStartNodeId(id)}
+              onSelectDestination={(id) => setEndNodeId(id)}
             />
           </div>
 

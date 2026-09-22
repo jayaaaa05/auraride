@@ -1,6 +1,7 @@
 const { cityGraph } = require('../dsa/Graph');
 const { findShortestPath } = require('../dsa/Dijkstra');
 const { matchDrivers, DEFAULT_SIMULATED_DRIVERS } = require('../dsa/DriverMatcher');
+const { incrementDsaQueryCount } = require('../socket/socketHandler');
 const Driver = require('../models/Driver');
 
 /**
@@ -132,6 +133,7 @@ const calculateRoute = async (req, res) => {
       });
     }
 
+    incrementDsaQueryCount();
     const dijkstraResult = findShortestPath(startNodeId, endNodeId, cityGraph);
 
     if (!dijkstraResult.found) {
