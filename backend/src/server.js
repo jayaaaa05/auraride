@@ -5,6 +5,7 @@ const cors = require('cors');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
+const dsaRoutes = require('./routes/dsaRoutes');
 
 // Connect to MongoDB
 connectDB();
@@ -37,6 +38,7 @@ app.get('/api/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/dsa', dsaRoutes);
 
 // Socket.IO connection events
 io.on('connection', (socket) => {

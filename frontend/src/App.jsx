@@ -2,20 +2,16 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import RiderDashboard from './pages/rider/RiderDashboard';
 
-const DashboardView = () => {
+const AuthenticatedLayout = () => {
   const { user, role, logout } = useAuth();
-  const [driverOnline, setDriverOnline] = useState(
-    Boolean(user?.driverProfile?.isOnline)
-  );
-
-  const driverProfile = user?.driverProfile;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       {/* Top Navbar */}
-      <header className="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <header className="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-bold text-white shadow-md shadow-indigo-500/20">
               A
@@ -48,136 +44,9 @@ const DashboardView = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/50 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-widest font-semibold text-cyan-400 mb-1">
-                AuraRide Mobility Platform
-              </p>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                Welcome, {user?.name}!
-              </h1>
-              <p className="text-sm text-slate-400 mt-1">
-                {role === 'driver'
-                  ? 'Manage your vehicle availability, inspect incoming ride requests, and track real-time earnings.'
-                  : 'Book instant Moto, Auto, Economy, or Premium rides with real-time driver telemetry.'}
-              </p>
-            </div>
-
-            {role === 'driver' && (
-              <button
-                type="button"
-                onClick={() => setDriverOnline((prev) => !prev)}
-                className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 self-start sm:self-auto ${
-                  driverOnline
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-slate-800 text-slate-300 border border-slate-700'
-                }`}
-              >
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    driverOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                  }`}
-                />
-                {driverOnline ? 'Online & Receiving Rides' : 'Go Online'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Account & Role Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
-              Account Profile
-            </h3>
-            <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-slate-400">Name</dt>
-                <dd className="font-medium text-slate-100">{user?.name}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-400">Email</dt>
-                <dd className="font-medium text-slate-100">{user?.email}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-400">Phone</dt>
-                <dd className="font-medium text-slate-100">
-                  {user?.phone || 'Not specified'}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-400">Active Role</dt>
-                <dd className="font-semibold uppercase text-indigo-400">
-                  {role}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          {role === 'driver' ? (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 md:col-span-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-4">
-                Registered Vehicle & Telemetry
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
-                  <span className="text-xs text-slate-400 block">Model</span>
-                  <span className="text-base font-semibold text-white mt-1 block">
-                    {driverProfile?.vehicle?.model || 'Configured Vehicle'}
-                  </span>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
-                  <span className="text-xs text-slate-400 block">Plate Number</span>
-                  <span className="text-base font-semibold text-cyan-300 mt-1 block">
-                    {driverProfile?.vehicle?.plateNumber || 'N/A'}
-                  </span>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
-                  <span className="text-xs text-slate-400 block">Category</span>
-                  <span className="text-base font-semibold text-white mt-1 block">
-                    {driverProfile?.vehicle?.type || 'Economy'} (
-                    {driverProfile?.vehicle?.capacity || 4} seats)
-                  </span>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
-                  <span className="text-xs text-slate-400 block">Driver Rating</span>
-                  <span className="text-base font-semibold text-amber-400 mt-1 block">
-                    ★ {Number(driverProfile?.rating ?? 5.0).toFixed(1)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 md:col-span-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-4">
-                Available AuraRide Fleet
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  { name: 'Moto', desc: '1 Passenger • Fast' },
-                  { name: 'Auto', desc: '3 Passengers • City' },
-                  { name: 'Economy', desc: '4 Passengers • Value' },
-                  { name: 'Premium', desc: '4 Passengers • Luxury' },
-                ].map((tier) => (
-                  <div
-                    key={tier.name}
-                    className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-indigo-500/40 transition"
-                  >
-                    <span className="text-sm font-bold text-white block">
-                      {tier.name}
-                    </span>
-                    <span className="text-xs text-slate-400 mt-1 block">
-                      {tier.desc}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Main RiderDashboard View */}
+      <main className="flex-1">
+        <RiderDashboard />
       </main>
     </div>
   );
@@ -188,7 +57,7 @@ const AuthShell = () => {
   const [authView, setAuthView] = useState('login');
 
   if (isAuthenticated) {
-    return <DashboardView />;
+    return <AuthenticatedLayout />;
   }
 
   return (
@@ -244,7 +113,7 @@ const AuthShell = () => {
       </div>
 
       <footer className="relative z-10 text-center text-xs text-slate-500 mt-8">
-        AuraRide Real-Time Ride Hailing System • Full-Stack Auth & Telemetry
+        AuraRide Real-Time Ride Hailing System • DSA Shortest Path & PriorityQueue Dispatch
       </footer>
     </div>
   );
