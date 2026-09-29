@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider, useSocket } from './context/SocketContext';
 import RoleNav from './components/RoleNav';
+import AlgorithmBenchmarkModal from './components/AlgorithmBenchmarkModal';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import RiderDashboard from './pages/rider/RiderDashboard';
@@ -10,19 +11,27 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 
 const AuthenticatedPortalRouter = () => {
   const { activePortal } = useSocket();
+  const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <RoleNav />
+      <RoleNav onOpenBenchmarkLab={() => setBenchmarkModalOpen(true)} />
       <main className="flex-1">
         {activePortal === 'driver' ? (
           <DriverDashboard />
         ) : activePortal === 'admin' ? (
           <AdminDashboard />
         ) : (
-          <RiderDashboard />
+          <RiderDashboard
+            onOpenBenchmarkLab={() => setBenchmarkModalOpen(true)}
+          />
         )}
       </main>
+
+      <AlgorithmBenchmarkModal
+        isOpen={benchmarkModalOpen}
+        onClose={() => setBenchmarkModalOpen(false)}
+      />
     </div>
   );
 };
@@ -96,7 +105,7 @@ const AuthShell = () => {
       </div>
 
       <footer className="relative z-10 text-center text-xs text-slate-500 mt-8">
-        AuraRide Real-Time Ride Hailing System • DSA Shortest Path, PriorityQueue Dispatch & Socket.IO Telemetry
+        AuraRide 100-Mark Capstone • Dijkstra vs A* Search • 2D QuadTree • Surge Pricing & Socket.IO
       </footer>
     </div>
   );

@@ -51,7 +51,7 @@ const DEMO_PERSONAS = [
   },
 ];
 
-const RoleNav = () => {
+const RoleNav = ({ onOpenBenchmarkLab }) => {
   const { user, logout } = useAuth();
   const {
     connected,
@@ -100,16 +100,24 @@ const RoleNav = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-400 hidden sm:block">
-              DSA Dijkstra Routing • Min-Heap Dispatch • Real-Time Telemetry
+              Dijkstra & A* Routing • 2D QuadTree • Min-Heap Dispatch
             </p>
           </div>
         </div>
 
-        {/* Center Portal Navigation Tabs */}
+        {/* Center Portal Navigation Tabs + DSA Performance Lab Button */}
         <nav className="flex items-center gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
           {[
-            { id: 'rider', label: 'Rider Portal', badge: activeRide?.otp ? `OTP ${activeRide.otp}` : null },
-            { id: 'driver', label: 'Driver Console', badge: incomingOffer ? '1 Offer!' : null },
+            {
+              id: 'rider',
+              label: 'Rider Portal',
+              badge: activeRide?.otp ? `OTP ${activeRide.otp}` : null,
+            },
+            {
+              id: 'driver',
+              label: 'Driver Console',
+              badge: incomingOffer ? '1 Offer!' : null,
+            },
             { id: 'admin', label: 'Admin Monitor', badge: null },
           ].map((tab) => {
             const isActive = activePortal === tab.id;
@@ -139,6 +147,16 @@ const RoleNav = () => {
               </button>
             );
           })}
+
+          {onOpenBenchmarkLab && (
+            <button
+              type="button"
+              onClick={onOpenBenchmarkLab}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-amber-400/15 hover:bg-amber-400/25 text-amber-300 border border-amber-400/40 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>🔬 DSA Lab</span>
+            </button>
+          )}
         </nav>
 
         {/* Right Quick-Demo Account Switcher & Logout */}
@@ -153,8 +171,9 @@ const RoleNav = () => {
             <select
               id="quick-demo-switcher"
               value={
-                DEMO_PERSONAS.find((p) => p.portal === activePortal && p.id === demoPersona.id)
-                  ?.key ||
+                DEMO_PERSONAS.find(
+                  (p) => p.portal === activePortal && p.id === demoPersona.id
+                )?.key ||
                 DEMO_PERSONAS.find((p) => p.portal === activePortal)?.key ||
                 'rider-alex'
               }
@@ -167,15 +186,6 @@ const RoleNav = () => {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="hidden lg:flex flex-col items-end">
-            <span className="text-xs font-semibold text-slate-200">
-              {user?.name || demoPersona.name}
-            </span>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider">
-              {activePortal} view
-            </span>
           </div>
 
           <button
