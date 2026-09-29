@@ -1,203 +1,166 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 
-const DEMO_PERSONAS = [
-  {
-    key: 'rider-alex',
-    portal: 'rider',
-    label: 'Rider: Alex Morgan (Passenger)',
-    id: 'USR-RIDER-1',
-    name: 'Alex Morgan',
-    role: 'rider',
-  },
-  {
-    key: 'driver-vikram',
-    portal: 'driver',
-    label: 'Driver: Vikramaditya Rao (Economy • Dzire)',
-    id: 'DRV-103',
-    name: 'Vikramaditya Rao',
-    role: 'driver',
-    rating: 4.92,
-    vehicle: {
-      model: 'Maruti Suzuki Dzire',
-      plateNumber: 'KA 03 MN 9012',
-      type: 'Economy',
-      capacity: 4,
-    },
-  },
-  {
-    key: 'driver-siddharth',
-    portal: 'driver',
-    label: 'Driver: Siddharth Menon (Premium • Ioniq 5)',
-    id: 'DRV-104',
-    name: 'Siddharth Menon',
-    role: 'driver',
-    rating: 4.98,
-    vehicle: {
-      model: 'Hyundai Ioniq 5 EV',
-      plateNumber: 'KA 01 ZP 0007',
-      type: 'Premium',
-      capacity: 4,
-    },
-  },
-  {
-    key: 'admin-ops',
-    portal: 'admin',
-    label: 'Admin: Central Dispatch Controller',
-    id: 'ADM-001',
-    name: 'AuraRide Ops Admin',
-    role: 'admin',
-  },
-];
-
 const RoleNav = ({ onOpenBenchmarkLab }) => {
   const { user, logout } = useAuth();
-  const {
-    connected,
-    activePortal,
-    setActivePortal,
-    demoPersona,
-    setDemoPersona,
-    activeRide,
-    incomingOffer,
-  } = useSocket();
+  const { activePortal, setActivePortal, setDemoPersona } = useSocket();
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
-  const handlePersonaChange = (e) => {
-    const selected = DEMO_PERSONAS.find((p) => p.key === e.target.value);
-    if (selected) {
-      setDemoPersona(selected);
-      setActivePortal(selected.portal);
+  const handlePortalSwitch = (portal) => {
+    setActivePortal(portal);
+    if (portal === 'driver') {
+      setDemoPersona({
+        id: 'DRV-103',
+        name: 'Vikramaditya Rao',
+        role: 'driver',
+        vehicle: {
+          model: 'White Swift Dzire',
+          plateNumber: 'KA 03 MN 9012',
+          type: 'Economy',
+          capacity: 4,
+        },
+        rating: 4.9,
+      });
+    } else if (portal === 'admin') {
+      setDemoPersona({
+        id: 'ADM-001',
+        name: 'AuraRide Ops Admin',
+        role: 'admin',
+      });
+    } else {
+      setDemoPersona({
+        id: 'USR-RIDER-1',
+        name: user?.name || 'Alex Morgan',
+        role: 'rider',
+      });
     }
   };
 
   return (
-    <header className="border-b border-slate-800/90 bg-slate-900/85 backdrop-blur-xl sticky top-0 z-40 shadow-lg shadow-slate-950/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex flex-wrap items-center justify-between gap-3">
-        {/* Brand & Socket Status */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-extrabold text-white shadow-md shadow-indigo-500/30">
-            A
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg tracking-tight text-white">
-                AuraRide
-              </span>
-              <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                  connected
-                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                    : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                  }`}
-                />
-                {connected ? 'Socket.IO Live' : 'Hybrid Sim Engine'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 hidden sm:block">
-              Dijkstra & A* Routing • 2D QuadTree • Min-Heap Dispatch
-            </p>
-          </div>
-        </div>
-
-        {/* Center Portal Navigation Tabs + DSA Performance Lab Button */}
-        <nav className="flex items-center gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
+    <>
+      {/* Minimal Floating Pill Header at Top Right */}
+      <header className="fixed top-4 right-4 z-40 flex items-center gap-2">
+        <nav className="bg-zinc-950/85 text-zinc-100 backdrop-blur-xl border border-zinc-800/90 shadow-2xl rounded-full p-1.5 flex items-center gap-1">
           {[
-            {
-              id: 'rider',
-              label: 'Rider Portal',
-              badge: activeRide?.otp ? `OTP ${activeRide.otp}` : null,
-            },
-            {
-              id: 'driver',
-              label: 'Driver Console',
-              badge: incomingOffer ? '1 Offer!' : null,
-            },
-            { id: 'admin', label: 'Admin Monitor', badge: null },
+            { id: 'rider', label: 'Rider' },
+            { id: 'driver', label: 'Driver' },
+            { id: 'admin', label: 'Admin' },
           ].map((tab) => {
             const isActive = activePortal === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActivePortal(tab.id)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                onClick={() => handlePortalSwitch(tab.id)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition cursor-pointer ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-500 text-white shadow-md shadow-indigo-500/25'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    ? 'bg-white text-zinc-950 shadow-md font-bold'
+                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/80'
                 }`}
               >
-                <span>{tab.label}</span>
-                {tab.badge && (
-                  <span
-                    className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
-                      tab.id === 'driver'
-                        ? 'bg-amber-400 text-slate-950 animate-pulse'
-                        : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/40'
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
+                {tab.label}
               </button>
             );
           })}
 
-          {onOpenBenchmarkLab && (
-            <button
-              type="button"
-              onClick={onOpenBenchmarkLab}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-amber-400/15 hover:bg-amber-400/25 text-amber-300 border border-amber-400/40 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>🔬 DSA Lab</span>
-            </button>
-          )}
-        </nav>
+          <div className="h-4 w-px bg-zinc-800 mx-1" />
 
-        {/* Right Quick-Demo Account Switcher & Logout */}
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2">
-            <label
-              htmlFor="quick-demo-switcher"
-              className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 whitespace-nowrap"
-            >
-              Demo Switch:
-            </label>
-            <select
-              id="quick-demo-switcher"
-              value={
-                DEMO_PERSONAS.find(
-                  (p) => p.portal === activePortal && p.id === demoPersona.id
-                )?.key ||
-                DEMO_PERSONAS.find((p) => p.portal === activePortal)?.key ||
-                'rider-alex'
-              }
-              onChange={handlePersonaChange}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              {DEMO_PERSONAS.map((persona) => (
-                <option key={persona.key} value={persona.key}>
-                  {persona.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Small Subtle Info Icon for Project Details */}
+          <button
+            type="button"
+            onClick={() => setDetailsModalOpen(true)}
+            title="Project Details"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70 transition cursor-pointer text-xs font-semibold"
+          >
+            ⓘ
+          </button>
 
+          {/* Quick Logout */}
           <button
             type="button"
             onClick={logout}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition cursor-pointer"
+            title="Sign Out"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-zinc-800/70 transition cursor-pointer text-xs font-semibold"
           >
-            Logout
+            ⏻
           </button>
+        </nav>
+      </header>
+
+      {/* Subtle Project Details Modal (Only shown when ⓘ is clicked) */}
+      {detailsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-zinc-100 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white text-zinc-950 font-black flex items-center justify-center text-sm shadow">
+                  A
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-tight">
+                    AuraRide Platform
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Production Full-Stack Architecture
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailsModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300 text-xs font-bold transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-zinc-300 leading-relaxed">
+              <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 space-y-1.5">
+                <span className="font-bold text-white block">
+                  Core Technologies
+                </span>
+                <p className="text-zinc-400">
+                  React 19, Tailwind CSS, Express, MongoDB Atlas, Leaflet, and real-time Socket.IO bidirectional telemetry.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 space-y-1.5">
+                <span className="font-bold text-white block">
+                  Autonomous Engine Features
+                </span>
+                <p className="text-zinc-400">
+                  Shortest-path routing, 2D QuadTree spatial driver indexing, dynamic surge multipliers, and a 4-digit PIN verification handshake.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              {onOpenBenchmarkLab ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailsModalOpen(false);
+                    onOpenBenchmarkLab();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition cursor-pointer"
+                >
+                  Open Algorithmic Lab →
+                </button>
+              ) : <div />}
+
+              <button
+                type="button"
+                onClick={() => setDetailsModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-white text-zinc-950 text-xs font-bold hover:bg-zinc-200 transition cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      )}
+    </>
   );
 };
 

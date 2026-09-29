@@ -14,17 +14,19 @@ const AuthenticatedPortalRouter = () => {
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="relative min-h-screen w-screen overflow-x-hidden bg-zinc-950 text-zinc-100">
       <RoleNav onOpenBenchmarkLab={() => setBenchmarkModalOpen(true)} />
-      <main className="flex-1">
+      <main className="w-full h-full">
         {activePortal === 'driver' ? (
-          <DriverDashboard />
+          <div className="pt-16">
+            <DriverDashboard />
+          </div>
         ) : activePortal === 'admin' ? (
-          <AdminDashboard />
+          <div className="pt-16">
+            <AdminDashboard />
+          </div>
         ) : (
-          <RiderDashboard
-            onOpenBenchmarkLab={() => setBenchmarkModalOpen(true)}
-          />
+          <RiderDashboard />
         )}
       </main>
 
