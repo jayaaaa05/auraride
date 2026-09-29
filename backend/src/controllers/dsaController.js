@@ -246,10 +246,12 @@ const calculateRoute = async (req, res) => {
 // @access  Public
 const executeBenchmark = async (req, res) => {
   try {
-    const startId = req.body.startNode || req.body.startNodeId || 'A1';
-    const endId = req.body.endNode || req.body.endNodeId || 'A10';
-    const iterations = req.body.iterations || 500;
-    const simulatedDemand = req.body.simulatedDemand;
+    const body = req.body || {};
+    const query = req.query || {};
+    const startId = body.startNode || body.startNodeId || query.startNode || query.startNodeId || 'A1';
+    const endId = body.endNode || body.endNodeId || query.endNode || query.endNodeId || 'A10';
+    const iterations = parseInt(body.iterations || query.iterations || 500, 10);
+    const simulatedDemand = body.simulatedDemand !== undefined ? body.simulatedDemand : query.simulatedDemand;
 
     incrementDsaQueryCount();
     const results = runAlgorithmBenchmark(startId, endId, {

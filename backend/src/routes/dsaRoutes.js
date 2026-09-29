@@ -10,6 +10,7 @@ const {
 
 router.get('/network', getNetworkGraph);
 router.post('/route', calculateRoute);
+router.get('/benchmark', executeBenchmark);
 router.post('/benchmark', executeBenchmark);
 router.get('/spatial-drivers', getSpatialDrivers);
 router.post('/dispatch', dispatchRide);

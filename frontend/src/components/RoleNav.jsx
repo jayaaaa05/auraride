@@ -41,7 +41,7 @@ const RoleNav = ({ onOpenBenchmarkLab }) => {
     <>
       {/* Minimal Floating Pill Header at Top Right */}
       <header className="fixed top-4 right-4 z-40 flex items-center gap-2">
-        <nav className="bg-zinc-950/85 text-zinc-100 backdrop-blur-xl border border-zinc-800/90 shadow-2xl rounded-full p-1.5 flex items-center gap-1">
+        <nav className="bg-zinc-950/90 text-zinc-100 backdrop-blur-xl border border-zinc-800/80 shadow-2xl rounded-full p-1.5 flex items-center gap-1 text-xs">
           {[
             { id: 'rider', label: 'Rider' },
             { id: 'driver', label: 'Driver' },
@@ -53,10 +53,10 @@ const RoleNav = ({ onOpenBenchmarkLab }) => {
                 key={tab.id}
                 type="button"
                 onClick={() => handlePortalSwitch(tab.id)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide transition cursor-pointer ${
                   isActive
-                    ? 'bg-white text-zinc-950 shadow-md font-bold'
-                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/80'
+                    ? 'bg-white text-zinc-950 shadow font-bold'
+                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/70'
                 }`}
               >
                 {tab.label}
@@ -64,14 +64,30 @@ const RoleNav = ({ onOpenBenchmarkLab }) => {
             );
           })}
 
-          <div className="h-4 w-px bg-zinc-800 mx-1" />
+          {/* Subtle DSA Engine Pill for Capstone Viva */}
+          {onOpenBenchmarkLab && (
+            <>
+              <div className="h-4 w-px bg-zinc-800/90 mx-0.5" />
+              <button
+                type="button"
+                onClick={onOpenBenchmarkLab}
+                title="View Algorithm & Spatial Telemetry Benchmark"
+                className="px-2.5 py-1.5 rounded-full text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/80 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="text-zinc-500 text-xs">⚡</span>
+                <span className="text-[11px] tracking-tight">DSA Engine</span>
+              </button>
+            </>
+          )}
+
+          <div className="h-4 w-px bg-zinc-800/90 mx-0.5" />
 
           {/* Small Subtle Info Icon for Project Details */}
           <button
             type="button"
             onClick={() => setDetailsModalOpen(true)}
-            title="Project Details"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70 transition cursor-pointer text-xs font-semibold"
+            title="Project Architecture Details"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/80 transition cursor-pointer text-xs font-semibold"
           >
             ⓘ
           </button>
@@ -81,7 +97,7 @@ const RoleNav = ({ onOpenBenchmarkLab }) => {
             type="button"
             onClick={logout}
             title="Sign Out"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-zinc-800/70 transition cursor-pointer text-xs font-semibold"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-zinc-900/80 transition cursor-pointer text-xs font-semibold"
           >
             ⏻
           </button>
