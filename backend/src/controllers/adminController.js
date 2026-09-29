@@ -41,6 +41,8 @@ const getMetrics = async (req, res) => {
       success: true,
       metrics: {
         ...baseMetrics,
+        onlineDriversCount: baseMetrics.activeOnlineDrivers,
+        dsaQueryCount: baseMetrics.dsaPathQueryCount,
         totalCompletedRides: Math.max(
           baseMetrics.totalCompletedRides,
           dbCompletedCount

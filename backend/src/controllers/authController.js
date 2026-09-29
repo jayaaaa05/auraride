@@ -41,10 +41,15 @@ const register = async (req, res) => {
       });
     }
 
+    if (role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin registration is not permitted via public registration.',
+      });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
-    const normalizedRole = ['rider', 'driver', 'admin'].includes(role)
-      ? role
-      : 'rider';
+    const normalizedRole = ['rider', 'driver'].includes(role) ? role : 'rider';
 
     if (normalizedRole === 'driver') {
       if (
@@ -344,9 +349,61 @@ const getMe = async (req, res) => {
   }
 };
 
+/**
+ * Automatically seeds the system administrator if not already present.
+ */
+const ensureDefaultAdmin = async () => {
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@auraride.in').toLowerCase().trim();
+  const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@AuraRide2026';
+
+  // Seed in-memory store
+  if (!memoryUsersByEmail.has(adminEmail)) {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(adminPassword, salt);
+    const memAdmin = {
+      _id: 'USR-ADM-001',
+      id: 'USR-ADM-001',
+      name: 'AuraRide System Admin',
+      email: adminEmail,
+      password: hashedPassword,
+      phone: '+91 99999 00000',
+      role: 'admin',
+      savedLocations: [],
+      isBlocked: false,
+    };
+    memoryUsersByEmail.set(adminEmail, memAdmin);
+    memoryUsersById.set('USR-ADM-001', memAdmin);
+  }
+
+  // Seed in MongoDB if connected
+  if (isMongoConnected()) {
+    try {
+      const existing = await User.findOne({ email: adminEmail });
+      if (!existing) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(adminPassword, salt);
+        await User.create({
+          name: 'AuraRide System Admin',
+          email: adminEmail,
+          password: hashedPassword,
+          phone: '+91 99999 00000',
+          role: 'admin',
+        });
+      }
+    } catch {
+      // Continue with in-memory admin
+    }
+  }
+};
+
+// Seed admin on module initialization
+ensureDefaultAdmin().catch(() => {});
+
 module.exports = {
   register,
   login,
   getMe,
+  ensureDefaultAdmin,
+  memoryUsersByEmail,
   memoryUsersById,
 };

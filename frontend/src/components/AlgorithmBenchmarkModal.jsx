@@ -119,8 +119,55 @@ export function runLocalBenchmarkFallback(startId, endId, simulatedDemand = 6) {
       ? Math.round((nodesSaved / dijkstraNodesVisited) * 100)
       : 0;
 
-  const dijkstraTimeMs = Number((0.18 + dijkstraNodesVisited * 0.042).toFixed(3));
-  const aStarTimeMs = Number((0.09 + aStarNodesVisited * 0.031).toFixed(3));
+  // Measure genuine execution times using high-resolution performance.now()
+  const t0D = performance.now();
+  for (let i = 0; i < 40; i++) {
+    const tempDist = new Map(GRAPH_NODES.map((n) => [n.id, Infinity]));
+    tempDist.set(startId, 0);
+    const q = [{ id: startId, p: 0 }];
+    const seen = new Set();
+    while (q.length > 0) {
+      q.sort((a, b) => a.p - b.p);
+      const c = q.shift();
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      if (c.id === endId) break;
+      for (const edge of adj.get(c.id) || []) {
+        const cand = c.p + edge.weightKm;
+        if (!seen.has(edge.node) && cand < tempDist.get(edge.node)) {
+          tempDist.set(edge.node, cand);
+          q.push({ id: edge.node, p: cand });
+        }
+      }
+    }
+  }
+  const t1D = performance.now();
+  const dijkstraTimeMs = Number((t1D - t0D).toFixed(3));
+
+  const t0A = performance.now();
+  for (let i = 0; i < 40; i++) {
+    const tempG = new Map(GRAPH_NODES.map((n) => [n.id, Infinity]));
+    tempG.set(startId, 0);
+    const q = [{ id: startId, f: heuristic(startId) }];
+    const closed = new Set();
+    while (q.length > 0) {
+      q.sort((a, b) => a.f - b.f);
+      const c = q.shift();
+      if (closed.has(c.id)) continue;
+      closed.add(c.id);
+      if (c.id === endId) break;
+      for (const edge of adj.get(c.id) || []) {
+        if (closed.has(edge.node)) continue;
+        const tg = tempG.get(c.id) + edge.weightKm;
+        if (tg < tempG.get(edge.node)) {
+          tempG.set(edge.node, tg);
+          q.push({ id: edge.node, f: tg + heuristic(edge.node) });
+        }
+      }
+    }
+  }
+  const t1A = performance.now();
+  const aStarTimeMs = Number((t1A - t0A).toFixed(3));
 
   // Surge Pricing Formula: Base * (1 + (ActiveRequestsInArea / CapacityThreshold) * SurgeFactor)
   const rawMultiplier = 1.0 * (1 + (simulatedDemand / 5) * 0.35);
@@ -142,13 +189,15 @@ export function runLocalBenchmarkFallback(startId, endId, simulatedDemand = 6) {
     nodesSaved,
     nodeReductionPercent,
     memoryAllocatedKB: 18.4,
+    dijkstraBigO: 'O((V + E) log V)',
+    aStarBigO: 'O(E) best-case / O((V + E) log V) worst-case (heuristic dependent)',
     spatialIndexing: {
       quadTreeQuadrantsVisited: 3,
       quadTreePointsInspected: 3,
       linearScanPointsInspected: 8,
       totalTreeQuadrants: 9,
       driversFoundInRadius: 4,
-      complexity: 'O(log N + K) vs O(N)',
+      complexity: 'O(log N + K) average (dependent on spatial distribution & tree balance)',
     },
     surge: {
       nodeId: startId,
@@ -265,7 +314,7 @@ const AlgorithmBenchmarkModal = ({ isOpen = true, onClose }) => {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Live Benchmarking: Dijkstra O((V + E) log V) vs A* Euclidean Heuristic O(E) • 2D QuadTree O(log N) • Surge Pricing Queue
+                Live Benchmarking: Dijkstra O((V + E) log V) vs A* (heuristic-dependent) • 2D QuadTree O(log N + K) • Surge Pricing Queue
               </p>
             </div>
           </div>
@@ -447,7 +496,7 @@ const AlgorithmBenchmarkModal = ({ isOpen = true, onClose }) => {
                     2. A* Search (Euclidean Heuristic)
                   </h3>
                   <p className="text-xs text-slate-400 font-mono mt-0.5">
-                    Big-O: <strong className="text-cyan-300">O(E) best-case with admissible h(n)</strong>
+                    Big-O: <strong className="text-cyan-300">{benchmark.aStarBigO || 'O(E) best-case / O((V + E) log V) worst-case'}</strong>
                   </p>
                 </div>
                 <div className="text-right">
@@ -629,7 +678,7 @@ const AlgorithmBenchmarkModal = ({ isOpen = true, onClose }) => {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Subdivides city bounding box into <strong className="text-white">NW, NE, SW, SE</strong> quadrants to prune distant drivers without linear O(N) scanning.
+                Subdivides city space into <strong className="text-white">NW, NE, SW, SE</strong> quadrants. Average range query is O(log N + K), dependent on spatial point distribution and tree depth.
               </p>
               <div className="grid grid-cols-3 gap-3 pt-1">
                 <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">

@@ -152,18 +152,37 @@ function matchDrivers(pickupCoords, candidateDrivers = [], vehicleType = null) {
       ? candidateDrivers
       : DEFAULT_SIMULATED_DRIVERS;
 
-  // Filter by vehicleType if requested; if no exact tier match exists in candidates, evaluate all
-  const filteredByTier = vehicleType
-    ? sourceDrivers.filter(
+  // 1. Filter for availability and valid driver status
+  const availableDrivers = sourceDrivers.filter((d) => {
+    const isOnline = d.isOnline !== false;
+    const notBlocked = !d.isBlocked;
+    const notOnTrip = d.status !== 'ON_TRIP' && !d.currentRideId;
+    return isOnline && notBlocked && notOnTrip;
+  });
+
+  // 2. Strict vehicle type compatibility filter
+  const compatibleDrivers = vehicleType
+    ? availableDrivers.filter(
         (d) =>
           d.vehicle?.type?.toLowerCase() === vehicleType.toLowerCase()
       )
-    : sourceDrivers;
+    : availableDrivers;
 
-  const pool = filteredByTier.length > 0 ? filteredByTier : sourceDrivers;
+  // If no compatible available drivers exist, return null rather than an incompatible vehicle
+  if (compatibleDrivers.length === 0) {
+    return {
+      optimalDriver: null,
+      rankedDrivers: [],
+      formula: 'Score = (0.6 * distanceKm) - (0.4 * driverRating)',
+      message: vehicleType
+        ? `No available ${vehicleType} drivers found nearby`
+        : 'No available drivers found nearby',
+    };
+  }
+
   const pq = new PriorityQueue();
 
-  for (const driver of pool) {
+  for (const driver of compatibleDrivers) {
     const loc = driver.currentLocation || { lat: 12.9716, lng: 77.5946 };
     const distanceKm = calculateHaversineKm(pickupCoords, loc);
     const rating = Number(driver.rating ?? 5.0);

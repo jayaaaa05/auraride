@@ -1,16 +1,55 @@
-# React + Vite
+# AuraRide — Frontend Web Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The AuraRide frontend is a modern, high-performance single-page web application built with **React 19**, **Vite 8**, **Tailwind CSS**, and **Leaflet / React-Leaflet**.
 
-Currently, two official plugins are available:
+For the complete project architecture, algorithmic explanations (Dijkstra, A*, QuadTree, Min-Heap), API documentation, and testing reports, please refer to the primary repository documentation:
+👉 **[Main AuraRide Documentation](../README.md)**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Key Features & UI Modules
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Rider Dashboard (`/`)**:
+  - Full-screen interactive dark map with real-time pickup/dropoff marker positioning.
+  - Global address search powered by OpenStreetMap Nominatim geocoding.
+  - Multi-tier vehicle fare estimations with dynamic surge pricing.
+  - Real-time driver trip progress tracking over calculated shortest-path polylines.
+  - Interactive Algorithmic Benchmark modal comparing Dijkstra vs. A* Search.
 
-## Expanding the ESLint configuration
+- **Driver Portal (`/driver`)**:
+  - Online/offline availability switch broadcasting GPS coordinates to backend QuadTree.
+  - Real-time incoming ride dispatch notifications with instant accept/reject capability.
+  - Automated transit simulation along road network waypoints.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Admin Central Command (`/admin`)**:
+  - RBAC-protected operational dashboard with real-time telemetry metrics.
+  - Gross platform revenue and completed ride counters.
+  - Driver verification management and abusive account suspension switches.
+
+---
+
+## Frontend Setup & Execution
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Configure Environment
+Copy `.env.example` to `.env`:
+```ini
+VITE_API_URL=http://localhost:5000/api
+VITE_SOCKET_URL=http://localhost:5000
+```
+
+### 3. Development Server
+```bash
+npm run dev
+# Running at http://localhost:5173
+```
+
+### 4. Production Build
+```bash
+npm run build
+```
+The compiled output is output to `dist/`.

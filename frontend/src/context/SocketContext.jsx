@@ -13,7 +13,7 @@ import api from '../services/api';
 export const SocketContext = createContext(null);
 
 const SOCKET_URL =
-  import.meta.env.VITE_SOCKET_URL || 'https://auraride-backend.onrender.com';
+  import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 const INITIAL_DEMO_DRIVERS = [
   {

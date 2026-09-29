@@ -14,6 +14,7 @@ const Ride = require('../models/Ride');
 const { cityGraph } = require('../dsa/Graph');
 const { findShortestPath } = require('../dsa/Dijkstra');
 const { matchDrivers, DEFAULT_SIMULATED_DRIVERS } = require('../dsa/DriverMatcher');
+const { QuadTree } = require('../dsa/QuadTree');
 
 /**
  * Shared live platform state synced with MongoDB and Socket.IO clients.
@@ -381,14 +382,24 @@ const initializeSocketHandler = (io) => {
           coords: [destination?.lat || 12.9121, destination?.lng || 77.6446],
         };
 
-        // Filter online, unblocked drivers from liveState
+        // Filter online, unblocked, available drivers from liveState
         const onlineFleet = Array.from(liveState.drivers.values()).filter(
-          (d) => d.isOnline !== false && !d.isBlocked
+          (d) => d.isOnline !== false && !d.isBlocked && d.status !== 'ON_TRIP'
         );
+
+        // Utilize 2D QuadTree spatial index to query nearby drivers within 8.5 km radius
+        const quadTree = new QuadTree();
+        onlineFleet.forEach((drv) => quadTree.insert(drv));
+        const spatialMatches = quadTree.queryRadius(startNode.coords, 8.5);
+
+        const candidates =
+          spatialMatches.drivers.length > 0
+            ? spatialMatches.drivers
+            : onlineFleet;
 
         const dispatchResult = matchDrivers(
           startNode.coords,
-          onlineFleet,
+          candidates,
           vehicleType
         );
 

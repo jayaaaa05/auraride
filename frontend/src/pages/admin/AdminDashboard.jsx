@@ -26,6 +26,7 @@ const AdminDashboard = () => {
   } = useSocket();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [authError, setAuthError] = useState(null);
 
   const fetchAdminData = async () => {
     setRefreshing(true);
@@ -35,6 +36,19 @@ const AdminDashboard = () => {
         api.get('/admin/drivers'),
         api.get('/admin/rides'),
       ]);
+
+      if (
+        metricsRes.status === 'rejected' &&
+        (metricsRes.reason?.response?.status === 403 ||
+          metricsRes.reason?.response?.status === 401)
+      ) {
+        setAuthError(
+          metricsRes.reason?.response?.data?.message ||
+            'Access denied (HTTP 403): Administrator credentials required for Central Command.'
+        );
+      } else {
+        setAuthError(null);
+      }
 
       if (
         metricsRes.status === 'fulfilled' &&
@@ -101,6 +115,22 @@ const AdminDashboard = () => {
           {refreshing ? 'Syncing Telemetry...' : '↻ Sync Live Telemetry'}
         </button>
       </div>
+
+      {/* RBAC Security Banner if 403 / 401 */}
+      {authError && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base">🛡️</span>
+            <div>
+              <span className="font-bold block">Role-Based Access Control Enforced</span>
+              <span className="text-rose-400/80">{authError}</span>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-[11px] font-mono font-bold">
+            HTTP 403
+          </span>
+        </div>
+      )}
 
       {/* 1. Metrics Strip: Total Revenue, Active Trips, Available Drivers, Network Nodes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

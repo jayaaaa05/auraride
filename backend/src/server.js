@@ -46,7 +46,22 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dsa', dsaRoutes);
 app.use('/api/admin', adminRoutes);
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`AuraRide Server & Socket.IO Engine listening on port ${PORT}`);
+// Archive Download Route
+const path = require('path');
+app.get(['/download', '/auraride.zip'], (req, res) => {
+  const zipPath = path.resolve(__dirname, '../../auraride.zip');
+  res.download(zipPath, 'auraride.zip', (err) => {
+    if (err && !res.headersSent) {
+      res.status(500).send('Error downloading zip file');
+    }
+  });
 });
+
+const PORT = process.env.PORT || 5000;
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`AuraRide Server & Socket.IO Engine listening on port ${PORT}`);
+  });
+}
+
+module.exports = { app, server };

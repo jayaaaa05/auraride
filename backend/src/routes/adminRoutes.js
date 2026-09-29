@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const authMiddleware = require('../middleware/authMiddleware');
 const {
   getMetrics,
   getDrivers,
@@ -7,6 +8,9 @@ const {
   toggleBlockUser,
   getRides,
 } = require('../controllers/adminController');
+
+// All routes in this router require a valid JWT token and 'admin' role
+router.use(authMiddleware.protect, authMiddleware.authorizeRoles('admin'));
 
 router.get('/metrics', getMetrics);
 router.get('/drivers', getDrivers);

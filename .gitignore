@@ -1,3 +1,29 @@
-node_modules 
-.env 
-dist 
+# Dependencies
+node_modules/
+package-lock.json.backup
+
+# Environment files & secrets
+.env
+*.env
+.env*.local
+
+# Production builds
+dist/
+dist-ssr/
+
+# Archives & logs
+*.zip
+*.tar
+*.log
+logs/
+npm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
