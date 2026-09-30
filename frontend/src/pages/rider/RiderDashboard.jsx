@@ -6,44 +6,65 @@ import AlgorithmBenchmarkModal from '../../components/AlgorithmBenchmarkModal';
 import {
   searchAddress,
   fetchOsrmDrivingRoute,
+  computeSurgeMultiplier,
   POPULAR_CHIPS,
   debounce,
 } from '../../services/geocoding';
 
-const VEHICLE_TIERS = [
+const BASE_TIER_CONFIG = [
   {
     key: 'Moto',
     name: 'Aura Moto',
-    tagline: 'Fast bike ride',
-    fare: 65,
-    eta: '2 mins away',
+    tagline: 'Fast bike ride • 1 Rider',
+    capacity: 1,
+    baseFare: 25,
+    perKmRate: 9.5,
+    perMinRate: 1.0,
+    minFare: 35,
+    speedMultiplier: 0.82,
+    baseEtaFactor: 1,
     icon: '⚡',
     vehicleEmoji: '🏍️',
   },
   {
     key: 'Auto',
     name: 'Aura Auto',
-    tagline: 'Doorstep 3-wheeler',
-    fare: 95,
-    eta: '3 mins away',
+    tagline: 'Doorstep 3-wheeler • 3 Seats',
+    capacity: 3,
+    baseFare: 35,
+    perKmRate: 13.5,
+    perMinRate: 1.25,
+    minFare: 50,
+    speedMultiplier: 1.0,
+    baseEtaFactor: 1.5,
     icon: '🛺',
     vehicleEmoji: '🛺',
   },
   {
     key: 'Economy',
     name: 'AuraGo',
-    tagline: 'Affordable compact sedan',
-    fare: 185,
-    eta: '4 mins away',
+    tagline: 'Affordable compact sedan • 4 Seats',
+    capacity: 4,
+    baseFare: 55,
+    perKmRate: 17.0,
+    perMinRate: 1.5,
+    minFare: 80,
+    speedMultiplier: 0.95,
+    baseEtaFactor: 2,
     icon: '🚗',
     vehicleEmoji: '🚗',
   },
   {
     key: 'Premium',
     name: 'Premier',
-    tagline: 'Top-rated luxury sedans',
-    fare: 295,
-    eta: '5 mins away',
+    tagline: 'Top-rated luxury sedans • 4 Seats',
+    capacity: 4,
+    baseFare: 95,
+    perKmRate: 24.5,
+    perMinRate: 2.2,
+    minFare: 140,
+    speedMultiplier: 0.9,
+    baseEtaFactor: 2.5,
     icon: '⭐',
     vehicleEmoji: '🚘',
   },
@@ -76,6 +97,11 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('Cash / UPI');
   const [isSearchingDrivers, setIsSearchingDrivers] = useState(false);
+  const [routeStats, setRouteStats] = useState({ distanceKm: 8.4, durationMin: 18 });
+  const [forceSurge, setForceSurge] = useState(null);
+
+  // Dynamic Surge Pricing Engine calculation
+  const surgeInfo = computeSurgeMultiplier(pickupText, dropoffText, forceSurge);
 
   // Evaluation modal
   const [showDsaLab, setShowDsaLab] = useState(false);
@@ -135,12 +161,18 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
     setActiveDropdown(null);
   };
 
-  // Fetch realistic curved road-following route from OSRM
+  // Fetch realistic curved road-following route from OSRM + calculate live distance and duration
   const calculateRoadRoute = useCallback(async () => {
     if (!pickupCoords || !dropoffCoords) return;
-    const roadCoords = await fetchOsrmDrivingRoute(pickupCoords, dropoffCoords);
-    if (roadCoords && roadCoords.length > 0) {
-      setRouteCoordinates(roadCoords);
+    const result = await fetchOsrmDrivingRoute(pickupCoords, dropoffCoords);
+    if (result) {
+      if (result.coordinates && result.coordinates.length > 0) {
+        setRouteCoordinates(result.coordinates);
+      }
+      setRouteStats({
+        distanceKm: result.distanceKm,
+        durationMin: result.durationMin,
+      });
     }
   }, [pickupCoords, dropoffCoords]);
 
@@ -148,12 +180,42 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
     calculateRoadRoute();
   }, [calculateRoadRoute]);
 
+  // Dynamically compute fare for each vehicle tier based on distance, duration & surge multiplier
+  const dynamicTiers = BASE_TIER_CONFIG.map((tier) => {
+    const adjustedDuration = Math.max(
+      1,
+      Math.round(routeStats.durationMin * tier.speedMultiplier)
+    );
+    const distanceCharge = routeStats.distanceKm * tier.perKmRate;
+    const timeCharge = adjustedDuration * tier.perMinRate;
+    const baseSubtotal = tier.baseFare + distanceCharge + timeCharge;
+    const fareWithoutSurge = Math.max(tier.minFare, Math.round(baseSubtotal));
+    const dynamicFare = Math.max(
+      tier.minFare,
+      Math.round(baseSubtotal * surgeInfo.multiplier)
+    );
+    const etaMins = Math.max(
+      2,
+      Math.round(tier.baseEtaFactor + routeStats.distanceKm * 0.15)
+    );
+
+    return {
+      ...tier,
+      fare: dynamicFare,
+      fareWithoutSurge,
+      hasSurge: surgeInfo.multiplier > 1.0,
+      eta: `${etaMins} mins away`,
+    };
+  });
+
+  const currentTier =
+    dynamicTiers.find((t) => t.key === selectedVehicle) || dynamicTiers[2];
+
   // Handle ride request with simulated radar sonar
   const handleRequestRide = () => {
     setIsSearchingDrivers(true);
 
-    const chosenTier =
-      VEHICLE_TIERS.find((t) => t.key === selectedVehicle) || VEHICLE_TIERS[2];
+    const chosenTier = currentTier;
 
     const rideData = requestRideRealtime({
       pickupNodeId: 'A5',
@@ -168,9 +230,10 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
         lat: dropoffCoords[0],
         lng: dropoffCoords[1],
       },
-      distanceKm: 8.4,
-      durationMin: 18,
+      distanceKm: routeStats.distanceKm,
+      durationMin: routeStats.durationMin,
       fare: chosenTier.fare,
+      surgeMultiplier: surgeInfo.multiplier,
       vehicleType: selectedVehicle,
       coordinates: routeCoordinates,
     });
@@ -195,9 +258,6 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
     setIsSearchingDrivers(false);
     cancelActiveRide('rider', 'Cancelled by user');
   };
-
-  const currentTier =
-    VEHICLE_TIERS.find((t) => t.key === selectedVehicle) || VEHICLE_TIERS[2];
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-zinc-950 font-sans">
@@ -328,6 +388,37 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
                 </div>
               </div>
 
+              {/* Live Route Telemetry & Dynamic Surge Pricing Pill */}
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-950/90 border border-zinc-800 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white flex items-center gap-1">
+                    <span>📏</span> {routeStats.distanceKm} km
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-zinc-300 font-semibold flex items-center gap-1">
+                    <span>⏱️</span> ~{routeStats.durationMin} mins
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForceSurge((prev) =>
+                      prev === null ? 1.4 : prev === 1.4 ? 1.8 : prev === 1.8 ? 1.0 : null
+                    )
+                  }
+                  title="Click to simulate peak rush-hour demand"
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 transition cursor-pointer border ${
+                    surgeInfo.multiplier > 1.0
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25'
+                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25'
+                  }`}
+                >
+                  <span>{surgeInfo.multiplier > 1.0 ? '⚡' : '✅'}</span>
+                  <span>{surgeInfo.badgeText}</span>
+                </button>
+              </div>
+
               {/* Quick-Tap Location Chips */}
               <div className="pt-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1.5 px-0.5">
@@ -348,14 +439,21 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
                 </div>
               </div>
 
-              {/* Authentic Uber Vehicle Selection Cards */}
+              {/* Authentic Uber Vehicle Selection Cards with Dynamic Fares */}
               <div className="space-y-2 pt-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block px-0.5">
-                  Choose a ride
-                </span>
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                    Choose a ride
+                  </span>
+                  {surgeInfo.multiplier > 1.0 && (
+                    <span className="text-[10px] font-extrabold text-amber-400 flex items-center gap-1">
+                      <span>⚡</span> {surgeInfo.reason}
+                    </span>
+                  )}
+                </div>
 
                 <div className="space-y-2">
-                  {VEHICLE_TIERS.map((tier) => {
+                  {dynamicTiers.map((tier) => {
                     const isSelected = selectedVehicle === tier.key;
 
                     return (
@@ -386,9 +484,16 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
                           </div>
                         </div>
 
-                        <span className="font-extrabold text-base text-white pl-2">
-                          ₹{tier.fare}
-                        </span>
+                        <div className="text-right pl-2 shrink-0">
+                          <span className="font-extrabold text-base text-white block">
+                            ₹{tier.fare}
+                          </span>
+                          {tier.hasSurge && (
+                            <span className="text-[10px] text-zinc-500 line-through block">
+                              ₹{tier.fareWithoutSurge}
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
@@ -423,6 +528,7 @@ const RiderDashboard = ({ onOpenBenchmarkLab }) => {
                 className="w-full py-4 px-6 rounded-2xl bg-white hover:bg-zinc-200 active:scale-[0.99] text-zinc-950 font-black text-sm tracking-wide transition shadow-xl cursor-pointer"
               >
                 Request {currentTier.name} • ₹{currentTier.fare}
+                {surgeInfo.multiplier > 1.0 ? ` (${surgeInfo.multiplier}x Surge)` : ''}
               </button>
             </>
           ) : isSearchingDrivers ? (
